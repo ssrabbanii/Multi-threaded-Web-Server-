@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="initial-scale=1.0">
+	<title>Client</title>
+	<link rel="stylesheet" href="bulma.css">
+	<style>
+		#container {
+			width: 600px;
+			height: 600px;
+			border-radius: 5px;
+			box-shadow: 0px 4px 80px rgba(0, 0, 0, 0.08), 0px 1.6711px 33.4221px rgba(0, 0, 0, 0.0575083), 0px 0.893452px 17.869px rgba(0, 0, 0, 0.0476886), 0px 0.500862px 10.0172px rgba(0, 0, 0, 0.04), 0px 0.266004px 5.32008px rgba(0, 0, 0, 0.0323114), 0px 0.11069px 2.21381px rgba(0, 0, 0, 0.0224916);
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+		}
+
+		#output {
+			width: 500px;
+			height: 200px;
+			position: absolute;
+			top: 50px;
+			left: 50px;
+			border: 1px solid rgb(194, 194, 194);
+			border-radius: 5px;
+			padding: 20px;
+			text-align: center;
+		}
+
+		button {
+			width: 150px;
+		}
+
+		#buttons, #buttons2 {
+			position: absolute;
+			top: 300px;
+			width: 500px;
+			left: 50%;
+			transform: translateX(-50%);
+			display: flex;
+			flex-direction: row;
+			justify-content: space-between;
+		}
+
+		#buttons2 {
+			top: 370px;
+		}
+
+		#img {
+			position: absolute;
+			top: 60px;
+			left: 200px;
+		}
+
+		.info {
+			position: absolute;
+			width: 100%;
+			bottom: 10px;
+			left: 0px;
+			display: flex;
+			justify-content: center;
+			color: #c3c3c3;
+		}
+
+		.info2 {
+			font-size: large;
+			font-weight: 600;
+			color: #939393;
+		}
+	</style>
+	<script>
+		const host = 'http://127.0.0.1:12000';
+		let divOutput;
+		let imgEl;
+		let lastMod;
+
+		const httpReq = (url, callback, type = 'GET', beforeSend) => {
+			const request = new XMLHttpRequest();
+
+			request.onloadend = () => { 
+				// if (request.readyState == 4)
+						callback(request);
+			}
+			
+			request.open(type, url, true); 
+			request.setRequestHeader("Cache-Control", "no-cache, no-store, max-age=0");
+			if(beforeSend) beforeSend(request);
+			request.send(null);
+		}
+
+		const reset = () => {
+			divOutput.innerHTML = '';
+			imgEl.style.display = 'none'
+		}
+
+		const fnGetFile = (file) => {
+			const url = `${host}/${file}`;
+			httpReq(url, response => {
+				reset();
+				if(response.status == 304) {
+					divOutput.innerHTML = '<span class="info2">304 Not Modified</span><br>'
+					lastMod = response.getResponseHeader('Last-Modified');
+					divOutput.innerHTML += '<span class="info">Last-Modified: {}</span>'.replace('{}', lastMod);
+				}
+				else if(response.status == 404)
+					divOutput.innerHTML = '<span class="info2">404<br>{}</span><br>'.replace('{}', response.responseText)
+				else {
+					divOutput.innerHTML = response.responseText;
+					lastMod = response.getResponseHeader('Last-Modified');
+					divOutput.innerHTML += '<span class="info">Last-Modified: {}</span>'.replace('{}', lastMod);
+				}
+			}, 'GET',
+			request => {
+				if(lastMod)
+					request.setRequestHeader('If-Modified-Since', lastMod);
+			});
+		}
+
+		const fnGetImage = () => {
+			reset();
+			const rand = Math.floor(Math.random() * Math.pow(10, 6));
+			imgEl.src = `${host}/image.png?random=${rand}`;
+			imgEl.style.display = 'unset'
+		}
+
+		const fnGetHead = () => {
+			reset();
+			httpReq(host, response => {
+				const headers = response.getAllResponseHeaders().split('\n');
+				divOutput.innerHTML = headers.join('<br>');
+			}, 'HEAD');
+		}
+
+		const fnUpdateLastMod = () => {
+			const url = `${host}/file.txt`;
+			httpReq(url, response => {
+				reset();
+				let el = '<span class="info2">{0}</span><br><span class="info">Last-Modified: {1}</span>';
+				el = el.replace('{0}', response.responseText);
+				el = el.replace('{1}', response.getResponseHeader('Last-Modified'));
+				divOutput.innerHTML = el;
+			}, 'POST');
+		}
+
+		const fnPutRequest = () => {
+			httpReq(host, response => {
+				reset();
+				if(response.status != 400) return;
+				let el = '<span class="info2">400 Bad Request</span>';
+				divOutput.innerHTML = el;
+			}, 'PUT');
+		}
+
+		const ready = () => {
+			divOutput = document.getElementById("output");
+			imgEl = document.getElementById("img");
+
+			imgEl.style.display = 'none';
+		}
+
+		document.addEventListener("DOMContentLoaded", ready);
+	</script>
+</head>
+<body>
+	<div id="container">
+		<div id="output"></div>
+		<img id="img" width="180" height="180"/>
+		<div id="buttons">
+			<button class="button" onclick="fnGetFile('file.txt')">Get Text File</button>
+			<button class="button" onclick="fnGetImage()">Get Image</button>
+			<button class="button" onclick="fnGetHead()">HEAD cmd</button>
+		</div>
+		<div id="buttons2">
+			<button class="button" onclick="fnUpdateLastMod()">Update Last-Mod</button>
+			<button class="button" onclick="fnPutRequest()">PUT Request</button>
+			<button class="button" onclick="fnGetFile('someFile.txt')">Get 404</button>
+		</div>
+	</div>
+</body>
+</html>
